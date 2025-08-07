@@ -1,13 +1,19 @@
 import asyncio
 import time
+import json
+import signal
 from collections import deque
+from datetime import datetime
 
 RUNTIME = "gvisor"
+DURATION = 2
+
+d = "{:%Y%m%d_%H%M%S}".format(datetime.now())
+OUTPUT_FILE = f"results_{d}.json"
 
 
 async def get_num_containers(runtime):
-    """Async call to count how many runc containers are running."""
-    if runtime.lower == "gvisor":
+    if runtime.lower() == "gvisor":
         cmd = "ps aux | grep -v grep | grep runsc-sandbox | wc -l"
     elif runtime.lower() == "runc":
         cmd = "runsc list | grep running | wc -l"
@@ -24,27 +30,26 @@ async def get_num_containers(runtime):
 
 
 async def get_busctl_latency():
+    t0 = time.monotonic()
     proc = await asyncio.create_subprocess_shell(
         "busctl get-property org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager Version",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
-    stdout, _ = await proc.communicate()
-    return int(stdout.decode().strip())
+    await proc.communicate()
+    return time.monotonic() - t0
 
 
 async def container_updater(shared, runtime, interval=1.0):
-    """Async task that updates container count every `interval` seconds."""
     while not shared["stop"]:
         try:
             shared["num_containers"] = await get_num_containers(runtime)
         except Exception:
-            shared["num_containers"] = -1
+            shared["num_containers"] = 0
         await asyncio.sleep(interval)
 
 
 async def latency_updater(shared, interval=1.0):
-    """Async task that updates container count every `interval` seconds."""
     while not shared["stop"]:
         try:
             shared["busctl_latency"] = await get_busctl_latency()
@@ -53,7 +58,7 @@ async def latency_updater(shared, interval=1.0):
         await asyncio.sleep(interval)
 
 
-async def monitor_dbus(duration=1000):  # ~16 min
+async def monitor_dbus(duration=DURATION):
     proc = await asyncio.create_subprocess_exec(
         "busctl",
         "monitor",
@@ -64,7 +69,6 @@ async def monitor_dbus(duration=1000):  # ~16 min
 
     window = deque(maxlen=10)
     data_log = []
-
     shared = {"num_containers": 0, "busctl_latency": -1, "stop": False}
     container_task = asyncio.create_task(container_updater(shared, RUNTIME))
     latency_task = asyncio.create_task(latency_updater(shared))
@@ -78,7 +82,6 @@ async def monitor_dbus(duration=1000):  # ~16 min
             now = time.time()
             if now - start_time >= duration:
                 break
-
             if proc.stdout.at_eof():
                 break
 
@@ -93,27 +96,89 @@ async def monitor_dbus(duration=1000):  # ~16 min
             if now - last_sample_time >= 0.1:
                 window.append(current_count)
                 avg = sum(window) / len(window)
-                data_log.append(
-                    {
-                        "timestamp": now,
-                        "avg_msgs_per_sec": avg * 10,
-                        "num_containers": shared["num_containers"],
-                        "busctl_latency": shared["busctl_latency"],
-                    }
-                )
+                obj = {
+                    "timestamp": now,
+                    "avg_msgs_per_sec": avg * 10,
+                    "num_containers": shared["num_containers"],
+                    "busctl_latency": shared["busctl_latency"],
+                }
+                data_log.append(obj)
+                print(obj)
                 current_count = 0
                 last_sample_time = now
 
-    except KeyboardInterrupt:
-        print("\nInterrupted by user. Finalizing...")
-
+    except asyncio.CancelledError:
+        print(">>> monitor_dbus: CancelledError caught. Exiting early.")
+        # Don't re-raise, we want to return the collected data
+    
     finally:
         shared["stop"] = True
-        await container_task
-        await latency_task
+        container_task.cancel()
+        latency_task.cancel()
+        try:
+            await container_task
+        except asyncio.CancelledError:
+            pass
+        try:
+            await latency_task
+        except asyncio.CancelledError:
+            pass
         proc.terminate()
-        return data_log
+
+    return data_log
+
+
+async def main():
+    data = []
+    shutdown_event = asyncio.Event()
+    
+    def signal_handler():
+        print("\n>>> Ctrl+C received. Shutting down gracefully...")
+        shutdown_event.set()
+
+    # Set up signal handler for graceful shutdown
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGINT, signal_handler)
+    loop.add_signal_handler(signal.SIGTERM, signal_handler)
+    
+    try:
+        # Create the monitoring task
+        monitor_task = asyncio.create_task(monitor_dbus())
+        
+        # Wait for either the task to complete or shutdown signal
+        done, pending = await asyncio.wait(
+            [monitor_task, asyncio.create_task(shutdown_event.wait())],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        
+        if shutdown_event.is_set():
+            # Shutdown was requested, cancel the monitor task
+            monitor_task.cancel()
+            try:
+                data = await monitor_task
+            except asyncio.CancelledError:
+                # This shouldn't happen since monitor_dbus doesn't re-raise CancelledError
+                data = []
+        else:
+            # Normal completion
+            data = monitor_task.result()
+            
+        # Cancel any remaining pending tasks
+        for task in pending:
+            task.cancel()
+            
+    except Exception as e:
+        print(f">>> Unexpected error: {e}")
+    finally:
+        print(f"Saving {len(data)} records to {OUTPUT_FILE}")
+        with open(OUTPUT_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        print("Done.")
 
 
 if __name__ == "__main__":
-    asyncio.run(monitor_dbus())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        # This should not happen now since we handle SIGINT in the event loop
+        print("\n>>> Fallback Ctrl+C handler. Data may not be saved.")
