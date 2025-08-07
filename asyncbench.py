@@ -5,8 +5,12 @@ import signal
 from collections import deque
 from datetime import datetime, timezone
 import zoneinfo
+import sys
+if len(sys.argv) != 2:
+    print("Usage: asyncbench.py <gvisor|runc>")
+    sys.exit(1)
 
-RUNTIME = "gvisor"
+RUNTIME = sys.argv[1]
 DURATION = 1000
 
 d = "{:%Y%m%d_%H%M%S}".format(datetime.now())

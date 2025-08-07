@@ -70,6 +70,7 @@ select.add_tools(range_tool)
 hist_src = ColumnDataSource(data=dict(members=[], counts=[]))
 hist_fig = figure(width=800, height=300, x_range=[], title="Histogram of 'member' Field")
 hist_fig.vbar(x='members', top='counts', width=0.9, source=hist_src)
+hist_fig.xaxis.major_label_orientation = "vertical"
 
 # --- Update histogram when x_range changes ---
 def update_histogram(attr, old, new):
