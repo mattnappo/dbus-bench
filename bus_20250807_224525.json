@@ -1,0 +1,128 @@
+[
+  {
+    "timestamp": 1754606725.53951,
+    "type": "method_call",
+    "sender": ":1.337",
+    "destination": "org.freedesktop.DBus",
+    "path": "/org/freedesktop/DBus",
+    "interface": "org.freedesktop.DBus",
+    "member": "Hello",
+    "_payload": {
+      "type": "",
+      "data": []
+    }
+  },
+  {
+    "timestamp": 1754606725.539537,
+    "type": "method_return",
+    "sender": "org.freedesktop.DBus",
+    "destination": ":1.337",
+    "path": null,
+    "interface": null,
+    "member": null,
+    "_payload": {
+      "type": "s",
+      "data": [
+        ":1.337"
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.539552,
+    "type": "signal",
+    "sender": "org.freedesktop.DBus",
+    "destination": null,
+    "path": "/org/freedesktop/DBus",
+    "interface": "org.freedesktop.DBus",
+    "member": "NameOwnerChanged",
+    "_payload": {
+      "type": "sss",
+      "data": [
+        ":1.337",
+        "",
+        ":1.337"
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.539567,
+    "type": "signal",
+    "sender": "org.freedesktop.DBus",
+    "destination": ":1.337",
+    "path": "/org/freedesktop/DBus",
+    "interface": "org.freedesktop.DBus",
+    "member": "NameAcquired",
+    "_payload": {
+      "type": "s",
+      "data": [
+        ":1.337"
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.53958,
+    "type": "method_call",
+    "sender": ":1.337",
+    "destination": "org.freedesktop.systemd1",
+    "path": "/org/freedesktop/systemd1",
+    "interface": "org.freedesktop.DBus.Properties",
+    "member": "Get",
+    "_payload": {
+      "type": "ss",
+      "data": [
+        "org.freedesktop.systemd1.Manager",
+        "Version"
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.539596,
+    "type": "method_return",
+    "sender": ":1.1",
+    "destination": ":1.337",
+    "path": null,
+    "interface": null,
+    "member": null,
+    "_payload": {
+      "type": "v",
+      "data": [
+        {
+          "type": "s",
+          "data": "252-51.0.2.el9_6.1"
+        }
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.539609,
+    "type": "signal",
+    "sender": "org.freedesktop.DBus",
+    "destination": ":1.337",
+    "path": "/org/freedesktop/DBus",
+    "interface": "org.freedesktop.DBus",
+    "member": "NameLost",
+    "_payload": {
+      "type": "s",
+      "data": [
+        ":1.337"
+      ]
+    }
+  },
+  {
+    "timestamp": 1754606725.539623,
+    "type": "signal",
+    "sender": "org.freedesktop.DBus",
+    "destination": null,
+    "path": "/org/freedesktop/DBus",
+    "interface": "org.freedesktop.DBus",
+    "member": "NameOwnerChanged",
+    "_payload": {
+      "type": "sss",
+      "data": [
+        ":1.337",
+        ":1.337",
+        ""
+      ]
+    }
+  }
+]

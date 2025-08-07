@@ -11,6 +11,7 @@ DURATION = 1000
 
 d = "{:%Y%m%d_%H%M%S}".format(datetime.now())
 OUTPUT_FILE = f"results_{d}.json"
+BUS_OUTPUT_FILE = f"bus_{d}.json"
 
 
 async def get_num_containers(runtime):
@@ -91,6 +92,7 @@ async def monitor_dbus(duration=DURATION):
 
     window = deque(maxlen=10)
     data_log = []
+    bus_log = []
     shared = {"num_containers": 0, "busctl_latency": -1, "stop": False}
     container_task = asyncio.create_task(container_updater(shared, RUNTIME))
     latency_task = asyncio.create_task(latency_updater(shared))
@@ -111,7 +113,7 @@ async def monitor_dbus(duration=DURATION):
                 line = await asyncio.wait_for(proc.stdout.readline(), timeout=0.1)
                 line = json.loads(line.decode().strip())
                 line = handle_line(line)
-                print(json.dumps(line, indent=2))
+                bus_log.append(line)
                 current_count += 1
             except asyncio.TimeoutError:
                 pass
@@ -147,11 +149,12 @@ async def monitor_dbus(duration=DURATION):
             pass
         proc.terminate()
 
-    return data_log
+    return (data_log, bus_log)
 
 
 async def main():
     data = []
+    bus = []
     shutdown_event = asyncio.Event()
 
     def signal_handler():
@@ -168,7 +171,7 @@ async def main():
         monitor_task = asyncio.create_task(monitor_dbus())
 
         # Wait for either the task to complete or shutdown signal
-        done, pending = await asyncio.wait(
+        _done, pending = await asyncio.wait(
             [monitor_task, asyncio.create_task(shutdown_event.wait())],
             return_when=asyncio.FIRST_COMPLETED,
         )
@@ -177,13 +180,14 @@ async def main():
             # Shutdown was requested, cancel the monitor task
             monitor_task.cancel()
             try:
-                data = await monitor_task
+                data, bus = await monitor_task
             except asyncio.CancelledError:
                 # This shouldn't happen since monitor_dbus doesn't re-raise CancelledError
-                data = []
+                data = None
+                bus = None
         else:
             # Normal completion
-            data = monitor_task.result()
+            data, bus = monitor_task.result()
 
         # Cancel any remaining pending tasks
         for task in pending:
@@ -195,6 +199,9 @@ async def main():
         print(f"Saving {len(data)} records to {OUTPUT_FILE}")
         with open(OUTPUT_FILE, "w") as f:
             json.dump(data, f, indent=2)
+        print(f"Saving {len(bus)} records to {BUS_OUTPUT_FILE}")
+        with open(BUS_OUTPUT_FILE, "w") as f:
+            json.dump(bus, f, indent=2)
         print("Done.")
 
 
