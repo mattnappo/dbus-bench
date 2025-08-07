@@ -1,12 +1,15 @@
 import matplotlib.pyplot as plt
-import datetime
+from datetime import datetime
 import json
 import sys
+
+d = "{:%Y%m%d_%H%M%S}".format(datetime.now())
+OUTFILE = f"plot_latency_{d}.png"
 
 
 def plot(data):
     # Parse data
-    times = [datetime.datetime.fromtimestamp(d["timestamp"]) for d in data]
+    times = [datetime.fromtimestamp(d["timestamp"]) for d in data]
     msgs = [d["avg_msgs_per_sec"] for d in data]
     containers = [d["num_containers"] for d in data]
     latency = [d["busctl_latency"] for d in data]
@@ -36,10 +39,7 @@ def plot(data):
     fig.autofmt_xdate()
     plt.title("D-Bus Load, Container Count, and Busctl Latency")
     # plt.show()
-    plt.savefig(
-        f"plot_latency_{str(datetime.datetime.now()).replace(' ', '_').replace(':', '_')}",
-        dpi=100,
-    )
+    plt.savefig(OUTFILE, dpi=150, bbox_inches="tight")
 
 
 if __name__ == "__main__":

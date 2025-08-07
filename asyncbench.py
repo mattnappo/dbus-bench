@@ -6,7 +6,7 @@ from collections import deque
 from datetime import datetime
 
 RUNTIME = "gvisor"
-DURATION = 2
+DURATION = 1000
 
 d = "{:%Y%m%d_%H%M%S}".format(datetime.now())
 OUTPUT_FILE = f"results_{d}.json"
@@ -16,7 +16,7 @@ async def get_num_containers(runtime):
     if runtime.lower() == "gvisor":
         cmd = "ps aux | grep -v grep | grep runsc-sandbox | wc -l"
     elif runtime.lower() == "runc":
-        cmd = "runsc list | grep running | wc -l"
+        cmd = "runc list | grep running | wc -l"
     else:
         assert False
 
@@ -103,14 +103,13 @@ async def monitor_dbus(duration=DURATION):
                     "busctl_latency": shared["busctl_latency"],
                 }
                 data_log.append(obj)
-                print(obj)
                 current_count = 0
                 last_sample_time = now
 
     except asyncio.CancelledError:
         print(">>> monitor_dbus: CancelledError caught. Exiting early.")
         # Don't re-raise, we want to return the collected data
-    
+
     finally:
         shared["stop"] = True
         container_task.cancel()
@@ -131,7 +130,7 @@ async def monitor_dbus(duration=DURATION):
 async def main():
     data = []
     shutdown_event = asyncio.Event()
-    
+
     def signal_handler():
         print("\n>>> Ctrl+C received. Shutting down gracefully...")
         shutdown_event.set()
@@ -140,17 +139,17 @@ async def main():
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGINT, signal_handler)
     loop.add_signal_handler(signal.SIGTERM, signal_handler)
-    
+
     try:
         # Create the monitoring task
         monitor_task = asyncio.create_task(monitor_dbus())
-        
+
         # Wait for either the task to complete or shutdown signal
         done, pending = await asyncio.wait(
             [monitor_task, asyncio.create_task(shutdown_event.wait())],
-            return_when=asyncio.FIRST_COMPLETED
+            return_when=asyncio.FIRST_COMPLETED,
         )
-        
+
         if shutdown_event.is_set():
             # Shutdown was requested, cancel the monitor task
             monitor_task.cancel()
@@ -162,11 +161,11 @@ async def main():
         else:
             # Normal completion
             data = monitor_task.result()
-            
+
         # Cancel any remaining pending tasks
         for task in pending:
             task.cancel()
-            
+
     except Exception as e:
         print(f">>> Unexpected error: {e}")
     finally:
