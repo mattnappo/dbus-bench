@@ -3,7 +3,8 @@ import time
 import json
 import signal
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
+import zoneinfo
 
 RUNTIME = "gvisor"
 DURATION = 1000
@@ -58,11 +59,32 @@ async def latency_updater(shared, interval=1.0):
         await asyncio.sleep(interval)
 
 
+def handle_line(line):
+    ts = line["timestamp-realtime"]
+    ts_sec = ts / 1_000_000
+    dt_utc = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+    edt = zoneinfo.ZoneInfo("America/New_York")
+    dt_edt = dt_utc.astimezone(edt)
+    t = dt_edt.timestamp()
+    obj = {
+        "timestamp": t,
+        "type": line.get("type"),
+        "sender": line.get("sender"),
+        "destination": line.get("destination"),
+        "path": line.get("path"),
+        "interface": line.get("interface"),
+        "member": line.get("member"),
+        "_payload": line.get("payload"),
+    }
+    return obj
+
+
 async def monitor_dbus(duration=DURATION):
     proc = await asyncio.create_subprocess_exec(
         "busctl",
         "monitor",
         "--system",
+        "--json=short",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -87,9 +109,10 @@ async def monitor_dbus(duration=DURATION):
 
             try:
                 line = await asyncio.wait_for(proc.stdout.readline(), timeout=0.1)
-                line = line.decode().strip()
-                if "Type=" in line:
-                    current_count += 1
+                line = json.loads(line.decode().strip())
+                line = handle_line(line)
+                print(json.dumps(line, indent=2))
+                current_count += 1
             except asyncio.TimeoutError:
                 pass
 
