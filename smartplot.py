@@ -10,6 +10,7 @@ from bokeh.layouts import column, row
 from bokeh.models import RangeTool, PreText
 import time
 
+TRUNCATE=100_000
 # Bokeh server version - no output_notebook() needed 
 
 # Handle arguments for both command line and Bokeh server
@@ -116,8 +117,8 @@ def update_histogram_throttled():
                                                   key=lambda msg: len(json.dumps(msg, default=str)), 
                                                   reverse=True)
             json_text_1st = json.dumps(filtered_messages_1st_sorted, indent=2, default=str)
-            if len(json_text_1st) > 25000:  # Smaller limit since we have two columns
-                json_text_1st = json_text_1st[:25000] + "\n... [truncated - too many messages to display]"
+            if len(json_text_1st) > TRUNCATE:  # Smaller limit since we have two columns
+                json_text_1st = json_text_1st[:TRUNCATE] + "\n... [truncated - too many messages to display]"
             text_box_1st.text = f"Most Common Member JSON (for current time range)\n\nMember: '{most_common_member}' ({most_count} occurrences)\nShowing {len(filtered_messages_1st)} messages (sorted by size, largest first):\n\n{json_text_1st}"
         else:
             text_box_1st.text = f"Most Common Member JSON (for current time range)\n\nMember: '{most_common_member}' but no messages found."
@@ -134,8 +135,8 @@ def update_histogram_throttled():
                                                       key=lambda msg: len(json.dumps(msg, default=str)), 
                                                       reverse=True)
                 json_text_2nd = json.dumps(filtered_messages_2nd_sorted, indent=2, default=str)
-                if len(json_text_2nd) > 25000:  # Smaller limit since we have two columns
-                    json_text_2nd = json_text_2nd[:25000] + "\n... [truncated - too many messages to display]"
+                if len(json_text_2nd) > TRUNCATE:  # Smaller limit since we have two columns
+                    json_text_2nd = json_text_2nd[:TRUNCATE] + "\n... [truncated - too many messages to display]"
                 text_box_2nd.text = f"Second Most Common Member JSON (for current time range)\n\nMember: '{second_common_member}' ({second_count} occurrences)\nShowing {len(filtered_messages_2nd)} messages (sorted by size, largest first):\n\n{json_text_2nd}"
             else:
                 text_box_2nd.text = f"Second Most Common Member JSON (for current time range)\n\nMember: '{second_common_member}' but no messages found."
@@ -188,4 +189,4 @@ middle_column = column(text_box_1st)
 right_column = column(text_box_2nd)
 layout = row(left_column, middle_column, right_column)
 curdoc().add_root(layout)
-curdoc().title = "Smart Plot Dashboard"
+curdoc().title = DATA_FILE
