@@ -5,24 +5,34 @@ import re
 
 from dataset import groups
 
-plt.figure(figsize=(19.2, 10.8), dpi=100)
+plt.figure(figsize=(19.2, 10.8), dpi=200)
 
-for label, file_list in groups.items():
+for label, file_list in groups:
     dfs = []
     for filename in file_list:
-        df = pd.read_csv(filename, delim_whitespace=True)
-        df["last_ms"] = df["last"] * 1000
+        df = pd.read_json(filename)
+        df["latency"] = df["latency"] * 1000
         dfs.append(df)
-    
-    # Combine all runs for the group
     combined = pd.concat(dfs, ignore_index=True)
     
     # Sort values for ECDF
-    sorted_vals = np.sort(combined["last_ms"])
+    sorted_vals = np.sort(combined["latency"])
     y_vals = np.arange(1, len(sorted_vals) + 1) / len(sorted_vals)
     
     # Plot ECDF line
     plt.plot(sorted_vals, y_vals, linestyle="-", label=label)
+
+    '''
+    # Percentile annotations
+    for perc in [0, 50, 90, 95]:
+        t = np.percentile(sorted_vals, perc)
+        # Find the closest y-value in the ECDF for this x
+        y_pos = y_vals[np.searchsorted(sorted_vals, t)]
+        plt.axvline(t, alpha=0.15, color="C0", linestyle="--")
+        # Place text slightly above the curve
+        plt.text(t, y_pos + 0.02, f"p{perc}: {t:.2f} ms",
+                rotation=0, va="bottom", ha="center", fontsize=6, color="C0") 
+    '''
 
 plt.xlabel("lag (ms)")
 plt.ylabel("Cumulative probability")
